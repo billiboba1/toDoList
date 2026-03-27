@@ -1,0 +1,4 @@
+/* 1rem ≈ 10px при 16px root (62.5%) — база для rem в UI */
+html {
+    font-size: 62.5%;
+}
