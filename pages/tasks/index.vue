@@ -131,7 +131,23 @@
 
         <div :class="[$style.panel, $style.cardBlock]">
             <div
-                v-if="showInitialLoading"
+                v-if="loadError && tasks.length"
+                :class="$style.loadErrorBanner"
+                role="alert"
+            >
+                <p :class="$style.loadErrorBannerText">{{ texts.loadError }}</p>
+                <VButton
+                    variant="secondary"
+                    size="sm"
+                    :disabled="loading"
+                    @click="retryLoad"
+                >
+                    {{ texts.retryLoad }}
+                </VButton>
+            </div>
+
+            <div
+                v-if="loading && !tasks.length"
                 :class="[$style.state, $style.stateLoading]"
             >
                 <div
@@ -143,7 +159,22 @@
             </div>
 
             <div
-                v-else-if="showEmptyState"
+                v-else-if="loadError && !tasks.length"
+                :class="[$style.state, $style.stateError]"
+                role="alert"
+            >
+                <p>{{ texts.loadError }}</p>
+                <VButton
+                    variant="primary"
+                    :disabled="loading"
+                    @click="retryLoad"
+                >
+                    {{ texts.retryLoad }}
+                </VButton>
+            </div>
+
+            <div
+                v-else-if="!tasks.length"
                 :class="[$style.state, $style.stateEmpty]"
             >
                 <p v-if="hasDebouncedSearch">{{ emptySearchMessage }}</p>
@@ -318,6 +349,7 @@
 import type { ITask } from '~/types/models';
 import { buildPagination } from '~/utils/pagination';
 
+// region Constants
 const texts = {
     heroTitle: 'To-Do List',
     addTask: 'Добавить задачу',
@@ -331,6 +363,8 @@ const texts = {
     sortByStatus: 'По статусу',
     pageSizeLabel: 'На странице',
     loadingTasks: 'Загружаем задачи…',
+    loadError: 'Ошибка при загрузке списка задач.',
+    retryLoad: 'Повторить',
     emptyList: 'Пока нет задач. Нажмите «Добавить задачу», чтобы создать первую.',
     pagerAria: 'Страницы',
     paginationGap: '…',
@@ -355,14 +389,6 @@ const texts = {
     deleteConfirm: (title: string) => `Удалить «${title}»?`
 };
 
-const auth = useAuth();
-const api = useApi();
-const user = computed(() => auth.user.value);
-
-const roleLabel = computed(() =>
-    user.value?.role === 'admin' ? texts.roleAdmin : texts.roleUser
-);
-
 const filterTabs = [
     { value: 'all' as const, label: texts.tabAll },
     { value: 'active' as const, label: texts.tabActive },
@@ -380,48 +406,49 @@ const pageSizeOptions = [
     { value: 10, label: '10' },
     { value: 20, label: '20' }
 ];
+// endregion
 
-function onToolbarFilterChange() {
-    page.value = 1;
-    fetchTasks();
-}
-
-function canModify(t: ITask) {
-    return auth.canModifyTask(t.createdBy);
-}
+// region Reactive state
+const auth = useAuth();
+const api = useApi();
 
 const searchInput = ref('');
 const searchDebounced = ref('');
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-
-const emptySearchMessage = computed(() => texts.emptySearch(searchDebounced.value.trim()));
-
-watch(searchInput, (v) => {
-    if (debounceTimer) {
-        clearTimeout(debounceTimer);
-    }
-    debounceTimer = setTimeout(() => {
-        searchDebounced.value = v;
-        page.value = 1;
-        fetchTasks();
-    }, 350);
-});
-
-function clearSearch() {
-    searchInput.value = '';
-    searchDebounced.value = '';
-    page.value = 1;
-    fetchTasks();
-}
 
 const filter = ref<'all' | 'active' | 'completed'>('all');
 const sort = ref<'createdAtDesc' | 'createdAtAsc' | 'status'>('createdAtDesc');
 const page = ref(1);
 const pageSize = ref(10);
 const loading = ref(true);
+const loadError = ref(false);
 const tasks = ref<ITask[]>([]);
 const total = ref(0);
 const togglingId = ref<string | null>(null);
+
+const modal = reactive({
+    open: false,
+    mode: 'create' as 'create' | 'edit',
+    saving: false,
+    error: '',
+    taskId: '' as string,
+    form: {
+        title: '',
+        description: '',
+        dueLocal: '',
+        isCompleted: false
+    }
+});
+// endregion
+
+// region Computed
+const user = computed(() => auth.user.value);
+
+const roleLabel = computed(() =>
+    user.value?.role === 'admin' ? texts.roleAdmin : texts.roleUser
+);
+
+const emptySearchMessage = computed(() => texts.emptySearch(searchDebounced.value.trim()));
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)));
 
@@ -430,20 +457,20 @@ const paginationItems = computed(() => buildPagination(totalPages.value, page.va
 const hasSearchQuery = computed(() => Boolean(searchInput.value.trim()));
 const hasDebouncedSearch = computed(() => Boolean(searchDebounced.value.trim()));
 
-const showInitialLoading = computed(() => loading.value && !tasks.value.length);
-const showEmptyState = computed(() => !loading.value && !tasks.value.length);
 const showListOverlay = computed(() => loading.value && tasks.value.length > 0);
 
 const showPager = computed(() => total.value > 0);
 const pagerPrevDisabled = computed(() => page.value <= 1 || loading.value);
 const pagerNextDisabled = computed(() => page.value >= totalPages.value || loading.value);
 
-function setFilter(v: typeof filter.value) {
-    filter.value = v;
-    page.value = 1;
-    fetchTasks();
-}
+const modalTitle = computed(() =>
+    modal.mode === 'create' ? texts.modalCreate : texts.modalEdit
+);
 
+const saveButtonLabel = computed(() => (modal.saving ? texts.saving : texts.save));
+// endregion
+
+// region Functions
 async function fetchTasks() {
     loading.value = true;
     try {
@@ -461,17 +488,35 @@ async function fetchTasks() {
         );
         tasks.value = res.items;
         total.value = res.total;
+        loadError.value = false;
     } catch {
-        tasks.value = [];
-        total.value = 0;
+        loadError.value = true;
     } finally {
         loading.value = false;
     }
 }
 
-onMounted(() => {
+function retryLoad() {
     fetchTasks();
-});
+}
+
+function clearSearch() {
+    searchInput.value = '';
+    searchDebounced.value = '';
+    page.value = 1;
+    fetchTasks();
+}
+
+function onToolbarFilterChange() {
+    page.value = 1;
+    fetchTasks();
+}
+
+function setFilter(v: typeof filter.value) {
+    filter.value = v;
+    page.value = 1;
+    fetchTasks();
+}
 
 function goToPage(n: number) {
     if (n === page.value || n < 1 || n > totalPages.value) {
@@ -495,6 +540,10 @@ function next() {
     }
 }
 
+function canModify(t: ITask) {
+    return auth.canModifyTask(t.createdBy);
+}
+
 function toLocal(iso: string) {
     const d = new Date(iso);
     const pad = (n: number) => String(n).padStart(2, '0');
@@ -509,26 +558,6 @@ function logout() {
     auth.logout();
     navigateTo('/login');
 }
-
-const modal = reactive({
-    open: false,
-    mode: 'create' as 'create' | 'edit',
-    saving: false,
-    error: '',
-    taskId: '' as string,
-    form: {
-        title: '',
-        description: '',
-        dueLocal: '',
-        isCompleted: false
-    }
-});
-
-const modalTitle = computed(() =>
-    modal.mode === 'create' ? texts.modalCreate : texts.modalEdit
-);
-
-const saveButtonLabel = computed(() => (modal.saving ? texts.saving : texts.save));
 
 function openCreate() {
     modal.mode = 'create';
@@ -560,6 +589,14 @@ function openEdit(t: ITask) {
 
 function closeModal() {
     modal.open = false;
+}
+
+function getErrorMessage(e: unknown) {
+    if (e && typeof e === 'object' && 'data' in e) {
+        const d = (e as { data?: { statusMessage?: string; message?: string } }).data;
+        return d?.statusMessage || d?.message;
+    }
+    return '';
 }
 
 async function saveModal() {
@@ -606,14 +643,6 @@ async function saveModal() {
     }
 }
 
-function getErrorMessage(e: unknown) {
-    if (e && typeof e === 'object' && 'data' in e) {
-        const d = (e as { data?: { statusMessage?: string; message?: string } }).data;
-        return d?.statusMessage || d?.message;
-    }
-    return '';
-}
-
 async function onToggleComplete(t: ITask) {
     if (!canModify(t)) {
         return;
@@ -642,6 +671,24 @@ async function remove(t: ITask) {
         loading.value = false;
     }
 }
+
+onMounted(() => {
+    fetchTasks();
+});
+// endregion
+
+// region Watch
+watch(searchInput, (v) => {
+    if (debounceTimer) {
+        clearTimeout(debounceTimer);
+    }
+    debounceTimer = setTimeout(() => {
+        searchDebounced.value = v;
+        page.value = 1;
+        fetchTasks();
+    }, 350);
+});
+// endregion
 </script>
 
 <style module>
@@ -857,6 +904,41 @@ async function remove(t: ITask) {
     margin-left: auto;
     margin-right: auto;
     line-height: 1.5;
+}
+
+.stateError {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.6rem;
+    color: #b71c1c;
+}
+
+.stateError :global(p) {
+    margin: 0;
+    max-width: 44.8rem;
+    line-height: 1.5;
+    font-weight: 600;
+}
+
+.loadErrorBanner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.2rem;
+    padding: 1.2rem 1.6rem;
+    border-bottom: 0.1rem solid #ffcdd2;
+    background: #fff8f8;
+}
+
+.loadErrorBannerText {
+    margin: 0;
+    flex: 1 1 20rem;
+    font-size: 1.44rem;
+    font-weight: 600;
+    color: #b71c1c;
+    line-height: 1.45;
 }
 
 .spinner {
