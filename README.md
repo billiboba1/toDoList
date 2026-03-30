@@ -54,7 +54,7 @@ npm run preview
 | `pageSize` | `10`         | Размер страницы (1–50). |
 | `search`   | —            | Поиск по заголовку и описанию. |
 | `filter`   | `all`        | `all` — все, `active` — активные, `completed` — выполненные. |
-| `sort`     | `dueDate`    | `dueDate` — по дедлайну, `status` — по статусу. |
+| `sort`     | `createdAtDesc` | `createdAtDesc` / `createdAtAsc` — по дате создания (убывание / возрастание), `status` — по статусу. |
 
 Ответ: `{ items, total, page, pageSize }`.
 

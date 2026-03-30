@@ -11,6 +11,7 @@ const tasks: ITask[] = [
         title: 'Пример задачи админа',
         description: 'Создал администратор',
         dueDate: new Date(Date.now() + 86400000).toISOString(),
+        createdAt: new Date(Date.now() - 2 * 86400000).toISOString(),
         isCompleted: false,
         createdBy: '1'
     },
@@ -19,6 +20,7 @@ const tasks: ITask[] = [
         title: 'Пример задачи пользователя',
         description: 'Обычный пользователь',
         dueDate: new Date(Date.now() + 172800000).toISOString(),
+        createdAt: new Date(Date.now() - 86400000).toISOString(),
         isCompleted: true,
         createdBy: '2'
     }
@@ -34,14 +36,17 @@ export function getTaskById(id: string) {
     return tasks.find((t) => t.id === id);
 }
 
-export function createTask(data: Omit<ITask, 'id'>) {
+export function createTask(data: Omit<ITask, 'id' | 'createdAt'>) {
     const id = `t${idCounter++}`;
-    const task: ITask = { id, ...data };
+    const task: ITask = { id, ...data, createdAt: new Date().toISOString() };
     tasks.push(task);
     return task;
 }
 
-export function updateTask(id: string, patch: Partial<Omit<ITask, 'id' | 'createdBy'>>) {
+export function updateTask(
+    id: string,
+    patch: Partial<Omit<ITask, 'id' | 'createdBy' | 'createdAt'>>
+) {
     const task = getTaskById(id);
     if (!task) {
         return null;
@@ -60,7 +65,7 @@ export function deleteTask(id: string) {
 }
 
 export type TaskFilter = 'all' | 'active' | 'completed';
-export type TaskSort = 'dueDate' | 'status';
+export type TaskSort = 'createdAtAsc' | 'createdAtDesc' | 'status';
 
 export function listTasks(options: {
     search?: string;
@@ -86,8 +91,10 @@ export function listTasks(options: {
         rows = rows.filter((t) => t.isCompleted);
     }
 
-    if (sort === 'dueDate') {
-        rows.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+    if (sort === 'createdAtAsc') {
+        rows.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    } else if (sort === 'createdAtDesc') {
+        rows.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     } else {
         rows.sort((a, b) => Number(a.isCompleted) - Number(b.isCompleted));
     }

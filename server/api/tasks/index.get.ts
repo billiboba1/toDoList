@@ -9,10 +9,15 @@ export default defineEventHandler((event) => {
     const pageSize = Math.min(50, Math.max(1, Number(q.pageSize) || 10));
     const search = typeof q.search === 'string' ? q.search : '';
     const filter = (q.filter as TaskFilter) || 'all';
-    const sort = (q.sort as TaskSort) || 'dueDate';
+    const sort = (q.sort as TaskSort) || 'createdAtDesc';
     const validFilter: TaskFilter =
         filter === 'active' || filter === 'completed' ? filter : 'all';
-    const validSort: TaskSort = sort === 'status' ? 'status' : 'dueDate';
+    const validSort: TaskSort =
+        sort === 'status'
+            ? 'status'
+            : sort === 'createdAtAsc'
+              ? 'createdAtAsc'
+              : 'createdAtDesc';
 
     return listTasks({
         search,

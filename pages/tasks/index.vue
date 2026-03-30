@@ -326,7 +326,8 @@ const texts = {
     searchPlaceholder: 'Поиск задач…',
     clearSearch: 'Очистить',
     sortLabel: 'Сортировка',
-    sortByDate: 'По дате',
+    sortCreatedDesc: 'Сначала новые',
+    sortCreatedAsc: 'Сначала старые',
     sortByStatus: 'По статусу',
     pageSizeLabel: 'На странице',
     loadingTasks: 'Загружаем задачи…',
@@ -369,7 +370,8 @@ const filterTabs = [
 ];
 
 const sortOptions = [
-    { value: 'dueDate' as const, label: texts.sortByDate },
+    { value: 'createdAtDesc' as const, label: texts.sortCreatedDesc },
+    { value: 'createdAtAsc' as const, label: texts.sortCreatedAsc },
     { value: 'status' as const, label: texts.sortByStatus }
 ];
 
@@ -413,7 +415,7 @@ function clearSearch() {
 }
 
 const filter = ref<'all' | 'active' | 'completed'>('all');
-const sort = ref<'dueDate' | 'status'>('dueDate');
+const sort = ref<'createdAtDesc' | 'createdAtAsc' | 'status'>('createdAtDesc');
 const page = ref(1);
 const pageSize = ref(10);
 const loading = ref(true);

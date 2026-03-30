@@ -7,7 +7,7 @@ export default defineNuxtConfig({
     },
     typescript: {
         strict: true,
-        typeCheck: false
+        typeCheck: true
     },
     runtimeConfig: {
         jwtSecret: process.env.JWT_SECRET || 'dev-secret-change-me'

@@ -15,7 +15,20 @@
             aria-haspopup="listbox"
             @click.stop="toggle"
         >
-            <span :class="$style['dropdown__trigger-label']">{{ displayLabel }}</span>
+            <span :class="$style['dropdown__trigger-inner']">
+                <span
+                    v-if="selectedIcon"
+                    :class="$style['dropdown__trigger-icon']"
+                    aria-hidden="true"
+                >
+                    <VIcon
+                        :name="selectedIcon"
+                        :size="18"
+                        :color="chevronColor"
+                    />
+                </span>
+                <span :class="$style['dropdown__trigger-label']">{{ displayLabel }}</span>
+            </span>
             <span
                 :class="$style['dropdown__trigger-chevron']"
                 aria-hidden="true"
@@ -59,6 +72,16 @@
                             :size="14"
                         />
                     </span>
+                    <span
+                        v-if="opt.icon"
+                        :class="$style['dropdown__item-icon']"
+                        aria-hidden="true"
+                    >
+                        <VIcon
+                            :name="opt.icon"
+                            :size="16"
+                        />
+                    </span>
                     <span :class="$style['dropdown__item-label']">{{ opt.label }}</span>
                 </button>
             </li>
@@ -68,10 +91,12 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import type { IconName } from './VIcon.vue';
 
 export type DropdownOption<T extends string | number = string | number> = {
     value: T;
     label: string;
+    icon?: IconName;
 };
 
 defineOptions({ name: 'VDropdown' });
@@ -93,10 +118,11 @@ const model = defineModel<string | number>({ required: true });
 const open = ref(false);
 const rootRef = ref<HTMLElement | null>(null);
 
-const displayLabel = computed(() => {
-    const opt = props.options.find((o) => o.value === model.value);
-    return opt?.label ?? String(model.value);
-});
+const selectedOption = computed(() => props.options.find((o) => o.value === model.value));
+
+const displayLabel = computed(() => selectedOption.value?.label ?? String(model.value));
+
+const selectedIcon = computed(() => selectedOption.value?.icon);
 
 const chevronColor = computed(() => (open.value ? '#2d6cc0' : '#6b7684'));
 
@@ -189,6 +215,20 @@ onBeforeUnmount(() => {
     border-color: var(--color-primary, #2d6cc0);
 }
 
+.dropdown__trigger-inner {
+    display: flex;
+    align-items: center;
+    gap: 0.56rem;
+    min-width: 0;
+    flex: 1;
+}
+
+.dropdown__trigger-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    line-height: 0;
+}
+
 .dropdown__trigger-label {
     min-width: 0;
     flex: 1;
@@ -214,6 +254,7 @@ onBeforeUnmount(() => {
     left: 0;
     right: 0;
     z-index: 40;
+    width: fit-content;
     margin: 0;
     padding: 0.56rem 0;
     list-style: none;
@@ -229,6 +270,7 @@ onBeforeUnmount(() => {
     gap: 0.72rem;
     padding: 0.8rem 1.04rem;
     border: none;
+    white-space: nowrap;
     font: inherit;
     font-size: 1.44rem;
     color: #fff;
@@ -256,6 +298,14 @@ onBeforeUnmount(() => {
     justify-content: center;
     line-height: 0;
     color: #fff;
+}
+
+.dropdown__item-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    line-height: 0;
+    color: #fff;
+    opacity: 0.92;
 }
 
 .dropdown__item-label {

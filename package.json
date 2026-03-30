@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "typecheck": "nuxt typecheck",
     "build": "nuxt build",
     "dev": "nuxt dev",
     "generate": "nuxt generate",

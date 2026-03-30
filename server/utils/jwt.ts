@@ -1,9 +1,12 @@
 import jwt from 'jsonwebtoken';
+import type { Secret, SignOptions } from 'jsonwebtoken';
+import type { StringValue } from 'ms';
 import type { H3Event } from 'h3';
 import type { IJwtPayload } from '~/types/models';
 
-export function signToken(payload: IJwtPayload, secret: string, expiresIn: string = '7d') {
-    return jwt.sign(payload, secret, { expiresIn });
+export function signToken(payload: IJwtPayload, secret: Secret, expiresIn: StringValue = '7d') {
+    const options: SignOptions = { expiresIn };
+    return jwt.sign(payload, secret, options);
 }
 
 export function readBearerToken(event: H3Event): string | null {

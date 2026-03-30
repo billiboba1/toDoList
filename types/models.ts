@@ -12,6 +12,7 @@ export interface ITask {
     title: string;
     description: string;
     dueDate: string;
+    createdAt: string;
     isCompleted: boolean;
     createdBy: string;
 }
